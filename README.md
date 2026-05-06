@@ -1,18 +1,28 @@
-# Darron Tap
+# Darron's Homebrew Tap
 
-## How do I install these formulae?
+Homebrew formulae for tools published by Darron.
 
-`brew install darron/tap/<formula>`
+## Install dbrain
 
-Or `brew tap darron/tap` and then `brew install <formula>`.
+```sh
+brew install darron/tap/dbrain
+```
 
-Or, in a `brew bundle` `Brewfile`:
+Or tap once and install by formula name:
+
+```sh
+brew tap darron/tap
+brew install dbrain
+```
+
+## Brewfile
 
 ```ruby
 tap "darron/tap"
-brew "<formula>"
+brew "dbrain"
 ```
 
 ## Documentation
 
-`brew help`, `man brew` or check [Homebrew's documentation](https://docs.brew.sh).
+Run `brew help`, `man brew`, or read Homebrew's documentation:
+https://docs.brew.sh
