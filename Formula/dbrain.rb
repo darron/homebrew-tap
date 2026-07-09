@@ -1,7 +1,7 @@
 class Dbrain < Formula
   desc "Local-first second-brain CLI"
   homepage "https://github.com/darron/dbrain"
-  version "0.4.0"
+  version "0.4.1"
   license "MIT"
 
   livecheck do
@@ -11,19 +11,19 @@ class Dbrain < Formula
 
   if OS.mac?
     if Hardware::CPU.arm?
-      url "https://github.com/darron/dbrain/releases/download/v0.4.0/dbrain_v0.4.0_darwin_arm64.tar.gz"
-      sha256 "9cadf084a6c8ec49f056841d92126c784c193b39b8803edd19d1a4b17059629d"
+      url "https://github.com/darron/dbrain/releases/download/v0.4.1/dbrain_v0.4.1_darwin_arm64.tar.gz"
+      sha256 "b7882d15bc547a47770b550e0e673bd6f23d46d2364482190b7f778be5cea35b"
     else
-      url "https://github.com/darron/dbrain/releases/download/v0.4.0/dbrain_v0.4.0_darwin_amd64.tar.gz"
-      sha256 "60179af78592d06603453ffb5be13f11d7e9a21e8ca5356315dec10bb824d5f0"
+      url "https://github.com/darron/dbrain/releases/download/v0.4.1/dbrain_v0.4.1_darwin_amd64.tar.gz"
+      sha256 "8c5e585af0d3a2dca8ed0881babdc09fb44a5d66cc34df96c90fe50faa09f9f2"
     end
   elsif OS.linux?
     if Hardware::CPU.arm?
-      url "https://github.com/darron/dbrain/releases/download/v0.4.0/dbrain_v0.4.0_linux_arm64.tar.gz"
-      sha256 "fe7491b335a8a65f74286f14b5d0a6c4070a9550997ad267a511f47cd31ac0b8"
+      url "https://github.com/darron/dbrain/releases/download/v0.4.1/dbrain_v0.4.1_linux_arm64.tar.gz"
+      sha256 "6012d4407012b1f033319ecbd773c41e65c4ffdcd37f882c21f41ec371975d0e"
     else
-      url "https://github.com/darron/dbrain/releases/download/v0.4.0/dbrain_v0.4.0_linux_amd64.tar.gz"
-      sha256 "61b3ff0c53b9e390c551e3cdae9bd3cbf13d47efbf082c71b7e4ebdb3ae70c0e"
+      url "https://github.com/darron/dbrain/releases/download/v0.4.1/dbrain_v0.4.1_linux_amd64.tar.gz"
+      sha256 "a1c2da2a726c313bb040f875401c0b9441f788b9d33e25220f28b29dc23cd1f1"
     end
   end
 
