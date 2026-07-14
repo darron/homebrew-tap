@@ -1,26 +1,26 @@
 class DbrainTest < Formula
   desc "Local-first second-brain CLI test candidate"
   homepage "https://github.com/darron/dbrain"
-  version "0.0.1.1"
+  version "0.0.2.1"
   license "MIT"
 
   conflicts_with "dbrain", because: "both install the dbrain binary"
 
   if OS.mac?
     if Hardware::CPU.arm?
-      url "https://github.com/darron/dbrain/releases/download/homebrew-test-1-1-security-harden-00b8d3dd9fc9/dbrain_homebrew-test-1-1-security-harden-00b8d3dd9fc9_darwin_arm64.tar.gz"
-      sha256 "abb14ffe58f2f6cf60ed00a6f7bac14cb356715f7c94a32918652df7c661cdd1"
+      url "https://github.com/darron/dbrain/releases/download/homebrew-test-2-1-summarize-fix-95f7537f25cd/dbrain_homebrew-test-2-1-summarize-fix-95f7537f25cd_darwin_arm64.tar.gz"
+      sha256 "6c0f69076316d870469e6688fec4c0b3477f9c6ba49f0af0c1ce496f788ce746"
     else
-      url "https://github.com/darron/dbrain/releases/download/homebrew-test-1-1-security-harden-00b8d3dd9fc9/dbrain_homebrew-test-1-1-security-harden-00b8d3dd9fc9_darwin_amd64.tar.gz"
-      sha256 "b010c49d9de3ea01eca28185e4f9e896e6477df50f7f1b0eb9b1f451ac4dbf0d"
+      url "https://github.com/darron/dbrain/releases/download/homebrew-test-2-1-summarize-fix-95f7537f25cd/dbrain_homebrew-test-2-1-summarize-fix-95f7537f25cd_darwin_amd64.tar.gz"
+      sha256 "93f5fcc9bbf8a62bca8b9699fa07fec5690803fd365f9d2d9354a91afb43231e"
     end
   elsif OS.linux?
     if Hardware::CPU.arm?
-      url "https://github.com/darron/dbrain/releases/download/homebrew-test-1-1-security-harden-00b8d3dd9fc9/dbrain_homebrew-test-1-1-security-harden-00b8d3dd9fc9_linux_arm64.tar.gz"
-      sha256 "176014526fc3f7ceddedbf75db91e400c25b7d0b054f41f30b00a4f119d9b7d8"
+      url "https://github.com/darron/dbrain/releases/download/homebrew-test-2-1-summarize-fix-95f7537f25cd/dbrain_homebrew-test-2-1-summarize-fix-95f7537f25cd_linux_arm64.tar.gz"
+      sha256 "787d49114d77a9ac891c79c7900636c936ac54c0110d5006eff122558b3752f8"
     else
-      url "https://github.com/darron/dbrain/releases/download/homebrew-test-1-1-security-harden-00b8d3dd9fc9/dbrain_homebrew-test-1-1-security-harden-00b8d3dd9fc9_linux_amd64.tar.gz"
-      sha256 "509060a6209a81bc3cdf18efa1725e3d0a60f6c635ff8eced0b1080a71940874"
+      url "https://github.com/darron/dbrain/releases/download/homebrew-test-2-1-summarize-fix-95f7537f25cd/dbrain_homebrew-test-2-1-summarize-fix-95f7537f25cd_linux_amd64.tar.gz"
+      sha256 "a958c5523cfcac2a8d564ffd4f8cf395f728800a8499f693ea25555515434248"
     end
   end
 
@@ -30,7 +30,7 @@ class DbrainTest < Formula
 
   test do
     output = shell_output("#{bin}/dbrain version")
-    assert_match "release_version: test/security-harden@00b8d3dd9fc9", output
-    assert_match "commit: 00b8d3dd9fc9227ada43f1ff8f8cf5ff66314c3e", output
+    assert_match "release_version: test/summarize-fix@95f7537f25cd", output
+    assert_match "commit: 95f7537f25cdec10d51eea732aaa7501ac2f4c07", output
   end
 end
