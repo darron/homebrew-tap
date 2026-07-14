@@ -4,6 +4,8 @@ class Dbrain < Formula
   version "0.6.1"
   license "MIT"
 
+  conflicts_with "dbrain-test", because: "both install the dbrain binary"
+
   livecheck do
     url :stable
     regex(/^v?(\d+(?:\.\d+)+)$/i)
