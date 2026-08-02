@@ -1,14 +1,11 @@
 class Dbrain < Formula
   desc "Local-first second-brain CLI"
   homepage "https://github.com/darron/dbrain"
-  version "0.8.0"
   license all_of: ["MIT", "Apache-2.0"]
   livecheck do
     url :stable
     regex(/^v?(\d+(?:\.\d+)+)$/i)
   end
-
-  conflicts_with "dbrain-test", because: "both install the dbrain binary"
 
   if OS.mac?
     if Hardware::CPU.arm?
@@ -35,15 +32,15 @@ class Dbrain < Formula
 
   test do
     assert_match "module_path: github.com/darron/dbrain", shell_output("#{bin}/dbrain version")
-status = shell_output(
-  "#{bin}/dbrain --root #{testpath}/dbrain --no-debug semantic status --json",
-)
-if OS.mac? && Hardware::CPU.arm?
-  assert_match '"state": "supported_ready"', status
-  assert_match '"backend": "usearch"', status
-  assert_match '"version": "2.26.0"', status
-else
-  assert_match '"state": "unsupported"', status
-end
+    status = shell_output(
+      "#{bin}/dbrain --root #{testpath}/dbrain --no-debug semantic status --json",
+    )
+    if OS.mac? && Hardware::CPU.arm?
+      assert_match '"state": "supported_ready"', status
+      assert_match '"backend": "usearch"', status
+      assert_match '"version": "2.26.0"', status
+    else
+      assert_match '"state": "unsupported"', status
+    end
   end
 end
