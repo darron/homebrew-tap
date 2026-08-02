@@ -4,8 +4,6 @@ class DbrainTest < Formula
   version "0.0.2.1"
   license "MIT"
 
-  conflicts_with "dbrain", because: "both install the dbrain binary"
-
   if OS.mac?
     if Hardware::CPU.arm?
       url "https://github.com/darron/dbrain/releases/download/homebrew-test-2-1-summarize-fix-95f7537f25cd/dbrain_homebrew-test-2-1-summarize-fix-95f7537f25cd_darwin_arm64.tar.gz"
