@@ -9,19 +9,19 @@ class Dbrain < Formula
 
   if OS.mac?
     if Hardware::CPU.arm?
-      url "https://github.com/darron/dbrain/releases/download/v0.8.7/dbrain_v0.8.7_darwin_arm64.tar.gz"
-      sha256 "d6014c1f5ada053d5a78d8b86aff089100cf6648a1aea43378ef4fed46f233c5"
+      url "https://github.com/darron/dbrain/releases/download/v0.8.8/dbrain_v0.8.8_darwin_arm64.tar.gz"
+      sha256 "04f74a1d4a0f3793ca78eaf98e2eb6a28917684ea673ea4bff8b1eae91a784a0"
     else
-      url "https://github.com/darron/dbrain/releases/download/v0.8.7/dbrain_v0.8.7_darwin_amd64.tar.gz"
-      sha256 "d797ff78e1ceea91fe559f72289db2afc20c1b4d1bd57f97877d98717e420e52"
+      url "https://github.com/darron/dbrain/releases/download/v0.8.8/dbrain_v0.8.8_darwin_amd64.tar.gz"
+      sha256 "37a25834c893dff57757cdcf53293499c3521a97bf79091feb7a6d09b50b006d"
     end
   elsif OS.linux?
     if Hardware::CPU.arm?
-      url "https://github.com/darron/dbrain/releases/download/v0.8.7/dbrain_v0.8.7_linux_arm64.tar.gz"
-      sha256 "4c75111ce9cb5cf9a722ea00aa997dadb1b62856dae22bef151ed3b87f8a2dc8"
+      url "https://github.com/darron/dbrain/releases/download/v0.8.8/dbrain_v0.8.8_linux_arm64.tar.gz"
+      sha256 "abab07825a2e9db95885a5151f46df9b2fd454b8c4a636151230f5c73771b63a"
     else
-      url "https://github.com/darron/dbrain/releases/download/v0.8.7/dbrain_v0.8.7_linux_amd64.tar.gz"
-      sha256 "c7f10ab278112739207b3873765e420fad8ab20e0c1f865d4d20c763248f7a76"
+      url "https://github.com/darron/dbrain/releases/download/v0.8.8/dbrain_v0.8.8_linux_amd64.tar.gz"
+      sha256 "3778e603f1fac08eb27fafcce1f845c0271d07e5a53fd86cf2e38546a1d2319c"
     end
   end
 
