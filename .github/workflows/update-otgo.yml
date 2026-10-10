@@ -1,0 +1,147 @@
+name: Update otgo
+
+"on":
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable tag; leave empty for latest
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: otgo-homebrew-tap-update
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    env:
+      REQUESTED_TAG: ${{ inputs.tag }}
+      TAP_REPOSITORY: darron/homebrew-tap
+      TAP_FORMULA_PATH: Formula/otgo.rb
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      sha256: ${{ steps.release.outputs.sha256 }}
+      publish: ${{ steps.formula.outputs.validate }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: homebrew-tap
+          persist-credentials: false
+      - name: Validate published stable release and download source
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${REQUESTED_TAG}"
+          if [ -z "${RELEASE_TAG}" ]; then
+            RELEASE_TAG="$(gh release view --repo darron/go-opentunnel --json tagName --jq .tagName)"
+          fi
+          export RELEASE_TAG
+          python3 -c 'import os,sys; sys.path.insert(0,"homebrew-tap/.github/scripts"); from update_homebrew import version; version(os.environ["RELEASE_TAG"])'
+          gh release view "${RELEASE_TAG}" --repo darron/go-opentunnel --json tagName,isDraft,isPrerelease > release.json
+          python3 - <<'PY'
+          import json, os
+          with open("release.json", encoding="utf-8") as source:
+              release = json.load(source)
+          if release["tagName"] != os.environ["RELEASE_TAG"]:
+              raise SystemExit("release tag mismatch")
+          if release["isDraft"] or release["isPrerelease"]:
+              raise SystemExit("release must be published and stable")
+          PY
+          printf 'RELEASE_TAG=%s\n' "${RELEASE_TAG}" >> "${GITHUB_ENV}"
+          curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 --max-time 120 \
+            "https://github.com/darron/go-opentunnel/archive/refs/tags/${RELEASE_TAG}.tar.gz" -o source.tar.gz
+          SOURCE_SHA256="$(shasum -a 256 source.tar.gz | cut -d ' ' -f 1)"
+          printf 'SOURCE_SHA256=%s\n' "${SOURCE_SHA256}" >> "${GITHUB_ENV}"
+          printf 'tag=%s\nsha256=%s\n' "${RELEASE_TAG}" "${SOURCE_SHA256}" >> "${GITHUB_OUTPUT}"
+      - name: Update only otgo formula
+        id: formula
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s homebrew-tap/.github/scripts -p 'test_update_homebrew.py'
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, "homebrew-tap/.github/scripts")
+          from update_homebrew import update
+          changed = update("homebrew-tap", os.environ["RELEASE_TAG"], os.environ["SOURCE_SHA256"])
+          validate = changed or os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"changed={str(changed).lower()}\nvalidate={str(validate).lower()}\n")
+          print("Updated formula." if changed else "Formula is already current.")
+          PY
+          ruby -c homebrew-tap/Formula/otgo.rb
+      - name: Commit candidate locally for Homebrew validation
+        if: steps.formula.outputs.changed == 'true'
+        working-directory: homebrew-tap
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- "${TAP_FORMULA_PATH}"; then
+            echo "Homebrew formula is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${TAP_FORMULA_PATH}"
+          git commit -m "Update otgo to ${RELEASE_TAG}"
+      - name: Validate candidate before publishing the tap
+        if: steps.formula.outputs.validate == 'true'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          set -euo pipefail
+          brew tap --custom-remote darron/otgo-ci "${GITHUB_WORKSPACE}/homebrew-tap"
+          brew style darron/otgo-ci/otgo
+          brew audit --strict darron/otgo-ci/otgo
+          brew install --build-from-source darron/otgo-ci/otgo
+          brew test darron/otgo-ci/otgo
+          "$(brew --prefix otgo)/bin/otgo" help
+  publish:
+    needs: validate
+    if: needs.validate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      SOURCE_SHA256: ${{ needs.validate.outputs.sha256 }}
+    steps:
+      # A fresh checkout prevents the release binary tested in the other job
+      # from leaving hooks, credential helpers or executable files here.
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Recreate only the validated formula change
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s .github/scripts -p 'test_update_homebrew.py'
+          python3 .github/scripts/update_homebrew.py --tap-dir . --tag "${RELEASE_TAG}" --sha256 "${SOURCE_SHA256}"
+          ruby -c Formula/otgo.rb
+          git config core.hooksPath /dev/null
+          if git diff --quiet -- Formula/otgo.rb; then
+            echo "Formula is already current."
+          else
+            test "$(git diff --name-only)" = "Formula/otgo.rb"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Formula/otgo.rb
+            git commit -m "Update otgo to ${RELEASE_TAG}"
+          fi
+      - name: Push validated tap update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git --hostname github.com
+          git -c core.hooksPath=/dev/null push origin HEAD:main
