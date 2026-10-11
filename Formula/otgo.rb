@@ -1,8 +1,8 @@
 class Otgo < Formula
   desc "OpenTunnel CLI with an embeddable Go client"
   homepage "https://github.com/darron/go-opentunnel"
-  url "https://github.com/darron/go-opentunnel/archive/refs/tags/v0.4.0.tar.gz"
-  sha256 "2c0fd0d1946c5157ace2237bd3caa95111a9c760e227562ba978f1dcf54b6852"
+  url "https://github.com/darron/go-opentunnel/archive/refs/tags/v0.5.0.tar.gz"
+  sha256 "fc1fac934452fe84371d197dd4949bd30dbe94c7441cd72d7a31dd48d08658be"
   license "MIT"
   head "https://github.com/darron/go-opentunnel.git", branch: "main"
 
