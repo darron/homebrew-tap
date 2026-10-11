@@ -26,8 +26,10 @@ The stable formula builds the CLI from the latest published release source.
 Use `brew install --HEAD darron/tap/otgo` for main. Only the CLI is installed;
 Go is a build dependency. Future stable releases update the formula automatically
 from [the tap's workflow](https://github.com/darron/homebrew-tap/actions/workflows/update-otgo.yml).
-It checks hourly and supports a manual run. It uses the tap's own Actions token;
-no personal token or additional secret is required.
+It runs when go-opentunnel publishes a stable release and supports manual runs;
+there is no scheduled polling. The source release hook needs `HOMEBREW_TAP_TOKEN`
+with Actions write permission for this tap. Validation and formula publishing use
+the tap's own Actions token.
 
 ## Brewfile
 
