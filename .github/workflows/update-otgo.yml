@@ -104,6 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           brew tap --custom-remote darron/otgo-ci "${GITHUB_WORKSPACE}/homebrew-tap"
+          brew trust --formula darron/otgo-ci/otgo
           brew style darron/otgo-ci/otgo
           brew audit --strict darron/otgo-ci/otgo
           brew install --build-from-source darron/otgo-ci/otgo
