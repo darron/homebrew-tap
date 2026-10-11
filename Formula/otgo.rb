@@ -9,11 +9,21 @@ class Otgo < Formula
   depends_on "go" => :build
 
   def install
-    system "go", "build", *std_go_args(output: bin/"otgo", ldflags: "-s -w"), "./cmd/otgo"
+    ldflags = %w[-s -w]
+    if build.stable?
+      ldflags += %w[-X main.buildRevision=4dd2042e9e2608d51c7864c3f85a2f252e31d63d -X main.buildState=clean]
+    end
+    system "go", "build", *std_go_args(output: bin/"otgo", ldflags: ldflags.join(" ")), "./cmd/otgo"
   end
 
   test do
     assert_match "Usage: otgo", shell_output("#{bin}/otgo help")
+    if build.head? || version >= Version.new("0.6.0")
+      output = shell_output("#{bin}/otgo version")
+      assert_match(/sha=[a-f0-9]{40} (clean|dirty)/, output)
+      assert_match "#{version} sha=", output if build.stable?
+      assert_match " clean", output if build.stable?
+    end
     output = shell_output("#{bin}/otgo get --data-dir #{testpath}/tunnels --json")
     assert_equal "null\n", output
     refute_path_exists testpath/"tunnels/default/private-key.pem"

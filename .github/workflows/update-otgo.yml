@@ -26,6 +26,7 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       sha256: ${{ steps.release.outputs.sha256 }}
+      revision: ${{ steps.release.outputs.revision }}
       publish: ${{ steps.formula.outputs.validate }}
     steps:
       # actions/checkout v7.0.1
@@ -57,6 +58,11 @@ jobs:
               raise SystemExit("release must be published and stable")
           PY
           printf 'RELEASE_TAG=%s\n' "${RELEASE_TAG}" >> "${GITHUB_ENV}"
+          SOURCE_REVISION="$(gh api "repos/darron/go-opentunnel/commits/${RELEASE_TAG}" --jq .sha)"
+          export SOURCE_REVISION
+          python3 -c 'import os,re; assert re.fullmatch(r"[a-f0-9]{40}",os.environ["SOURCE_REVISION"]), "invalid release revision"'
+          printf 'SOURCE_REVISION=%s\n' "${SOURCE_REVISION}" >> "${GITHUB_ENV}"
+          printf 'revision=%s\n' "${SOURCE_REVISION}" >> "${GITHUB_OUTPUT}"
           curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 --max-time 120 \
             "https://github.com/darron/go-opentunnel/archive/refs/tags/${RELEASE_TAG}.tar.gz" -o source.tar.gz
           SOURCE_SHA256="$(shasum -a 256 source.tar.gz | cut -d ' ' -f 1)"
@@ -71,7 +77,7 @@ jobs:
           import os, sys
           sys.path.insert(0, "homebrew-tap/.github/scripts")
           from update_homebrew import update
-          changed = update("homebrew-tap", os.environ["RELEASE_TAG"], os.environ["SOURCE_SHA256"])
+          changed = update("homebrew-tap", os.environ["RELEASE_TAG"], os.environ["SOURCE_SHA256"], os.environ["SOURCE_REVISION"])
           validate = changed or os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"changed={str(changed).lower()}\nvalidate={str(validate).lower()}\n")
@@ -112,6 +118,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ needs.validate.outputs.tag }}
       SOURCE_SHA256: ${{ needs.validate.outputs.sha256 }}
+      SOURCE_REVISION: ${{ needs.validate.outputs.revision }}
     steps:
       # A fresh checkout prevents the release binary tested in the other job
       # from leaving hooks, credential helpers or executable files here.
@@ -124,7 +131,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s .github/scripts -p 'test_update_homebrew.py'
-          python3 .github/scripts/update_homebrew.py --tap-dir . --tag "${RELEASE_TAG}" --sha256 "${SOURCE_SHA256}"
+          python3 .github/scripts/update_homebrew.py --tap-dir . --tag "${RELEASE_TAG}" --sha256 "${SOURCE_SHA256}" --revision "${SOURCE_REVISION}"
           ruby -c Formula/otgo.rb
           git config core.hooksPath /dev/null
           if git diff --quiet -- Formula/otgo.rb; then
