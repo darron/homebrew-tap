@@ -1,8 +1,8 @@
 class Otgo < Formula
   desc "OpenTunnel CLI with an embeddable Go client"
   homepage "https://github.com/darron/go-opentunnel"
-  url "https://github.com/darron/go-opentunnel/archive/refs/tags/v0.8.0.tar.gz"
-  sha256 "6f9e7b87ce4eef9430ff8315fa8db1a1f1340dea1191852fefb936507fd9d87b"
+  url "https://github.com/darron/go-opentunnel/archive/refs/tags/v0.9.0.tar.gz"
+  sha256 "5cad9c1134742036fa9713d12815d836579773efff159f16900690082de828cf"
   license "MIT"
   head "https://github.com/darron/go-opentunnel.git", branch: "main"
 
@@ -11,7 +11,7 @@ class Otgo < Formula
   def install
     ldflags = %w[-s -w]
     if build.stable?
-      ldflags += %w[-X main.buildRevision=abec630db748d80bf88fe9cf166ade786db0ed3d -X main.buildState=clean]
+      ldflags += %w[-X main.buildRevision=4726e313309302c838e2093e5ab221ae32084084 -X main.buildState=clean]
     end
     system "go", "build", *std_go_args(output: bin/"otgo", ldflags: ldflags.join(" ")), "./cmd/otgo"
   end
