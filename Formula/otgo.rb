@@ -1,29 +1,42 @@
 class Otgo < Formula
   desc "OpenTunnel CLI with an embeddable Go client"
   homepage "https://github.com/darron/go-opentunnel"
-  url "https://github.com/darron/go-opentunnel/archive/refs/tags/v0.11.0.tar.gz"
-  sha256 "f6f4154020b3a9dff0fa48bb5003b22d062c4f898e1448396a0f67f049c88057"
   license "MIT"
-  head "https://github.com/darron/go-opentunnel.git", branch: "main"
 
-  depends_on "go" => :build
+  on_macos do
+    on_arm do
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.11.0/otgo_0.11.0_darwin_arm64.tar.gz"
+      sha256 "80516b5fd09abb95b7fe008ac248e73e18bc3df39e0f5932538cbeded188e543"
+    end
+
+    on_intel do
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.11.0/otgo_0.11.0_darwin_amd64.tar.gz"
+      sha256 "477d8d2be432d1f67c7907edc74c8305cfc187299996b889440af4387bcb8cc2"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.11.0/otgo_0.11.0_linux_arm64.tar.gz"
+      sha256 "75dca7d1f7f833adebc2644ebcdc58ecb376f4a5ce4ea5f9b31e621fa48fecf4"
+    end
+
+    on_intel do
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.11.0/otgo_0.11.0_linux_amd64.tar.gz"
+      sha256 "4ca885261ceb28eaa5855d9b995cdfcb59720ada3f0791437802c5252ae36ff3"
+    end
+  end
+
+  # Preserve the exact executable published on GitHub.
+  skip_clean "bin/otgo"
 
   def install
-    ldflags = %w[-s -w]
-    if build.stable?
-      ldflags += %w[-X main.buildRevision=14620a57b0fe2dc88860304df90093cc24da09f5 -X main.buildState=clean]
-    end
-    system "go", "build", *std_go_args(output: bin/"otgo", ldflags: ldflags.join(" ")), "./cmd/otgo"
+    bin.install "otgo"
   end
 
   test do
     assert_match "Usage: otgo", shell_output("#{bin}/otgo help")
-    if build.head? || version >= Version.new("0.6.0")
-      output = shell_output("#{bin}/otgo version")
-      assert_match(/sha=[a-f0-9]{40} (clean|dirty)/, output)
-      assert_match "#{version} sha=", output if build.stable?
-      assert_match " clean", output if build.stable?
-    end
+    assert_equal "otgo #{version} sha=14620a57b0fe2dc88860304df90093cc24da09f5 clean\n", shell_output("#{bin}/otgo version")
     output = shell_output("#{bin}/otgo get --data-dir #{testpath}/tunnels --json")
     assert_equal "null\n", output
     refute_path_exists testpath/"tunnels/default/private-key.pem"
