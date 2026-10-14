@@ -4,7 +4,7 @@ name: Update otgo
   workflow_dispatch:
     inputs:
       tag:
-        description: Published stable tag; leave empty for latest
+        description: Published stable tag with binaries; leave empty for latest
         required: false
         type: string
 
@@ -19,15 +19,11 @@ jobs:
   validate:
     if: github.ref == 'refs/heads/main'
     runs-on: macos-15
-    env:
-      REQUESTED_TAG: ${{ inputs.tag }}
-      TAP_REPOSITORY: darron/homebrew-tap
-      TAP_FORMULA_PATH: Formula/otgo.rb
+    timeout-minutes: 15
     outputs:
       tag: ${{ steps.release.outputs.tag }}
-      sha256: ${{ steps.release.outputs.sha256 }}
       revision: ${{ steps.release.outputs.revision }}
-      publish: ${{ steps.formula.outputs.validate }}
+      formula_sha256: ${{ steps.formula.outputs.sha256 }}
     steps:
       # actions/checkout v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -35,109 +31,133 @@ jobs:
           ref: ${{ github.sha }}
           path: homebrew-tap
           persist-credentials: false
-      - name: Validate published stable release and download source
+      - name: Validate stable release and download its published binaries
         id: release
         env:
+          REQUESTED_TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          RELEASE_TAG="${REQUESTED_TAG}"
-          if [ -z "${RELEASE_TAG}" ]; then
-            RELEASE_TAG="$(gh release view --repo darron/go-opentunnel --json tagName --jq .tagName)"
+          tag="${REQUESTED_TAG}"
+          if [ -z "${tag}" ]; then
+            tag="$(gh release view --repo darron/go-opentunnel --json tagName --jq .tagName)"
           fi
-          export RELEASE_TAG
+          export RELEASE_TAG="${tag}"
           python3 -c 'import os,sys; sys.path.insert(0,"homebrew-tap/.github/scripts"); from update_homebrew import version; version(os.environ["RELEASE_TAG"])'
-          gh release view "${RELEASE_TAG}" --repo darron/go-opentunnel --json tagName,isDraft,isPrerelease > release.json
+          gh release view "${tag}" --repo darron/go-opentunnel --json tagName,isDraft,isPrerelease > release.json
           python3 - <<'PY'
           import json, os
-          with open("release.json", encoding="utf-8") as source:
-              release = json.load(source)
-          if release["tagName"] != os.environ["RELEASE_TAG"]:
-              raise SystemExit("release tag mismatch")
-          if release["isDraft"] or release["isPrerelease"]:
+          release = json.load(open("release.json", encoding="utf-8"))
+          if release["tagName"] != os.environ["RELEASE_TAG"] or release["isDraft"] or release["isPrerelease"]:
               raise SystemExit("release must be published and stable")
           PY
-          printf 'RELEASE_TAG=%s\n' "${RELEASE_TAG}" >> "${GITHUB_ENV}"
-          SOURCE_REVISION="$(gh api "repos/darron/go-opentunnel/commits/${RELEASE_TAG}" --jq .sha)"
-          export SOURCE_REVISION
-          python3 -c 'import os,re; assert re.fullmatch(r"[a-f0-9]{40}",os.environ["SOURCE_REVISION"]), "invalid release revision"'
-          printf 'SOURCE_REVISION=%s\n' "${SOURCE_REVISION}" >> "${GITHUB_ENV}"
-          printf 'revision=%s\n' "${SOURCE_REVISION}" >> "${GITHUB_OUTPUT}"
-          curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 --max-time 120 \
-            "https://github.com/darron/go-opentunnel/archive/refs/tags/${RELEASE_TAG}.tar.gz" -o source.tar.gz
-          SOURCE_SHA256="$(shasum -a 256 source.tar.gz | cut -d ' ' -f 1)"
-          printf 'SOURCE_SHA256=%s\n' "${SOURCE_SHA256}" >> "${GITHUB_ENV}"
-          printf 'tag=%s\nsha256=%s\n' "${RELEASE_TAG}" "${SOURCE_SHA256}" >> "${GITHUB_OUTPUT}"
-      - name: Update only otgo formula
+          revision="$(gh api "repos/darron/go-opentunnel/commits/${tag}" --jq .sha)"
+          export RELEASE_REVISION="${revision}"
+          python3 -c 'import os,sys; sys.path.insert(0,"homebrew-tap/.github/scripts"); from release_artifacts import validate_metadata; validate_metadata(os.environ["RELEASE_TAG"],os.environ["RELEASE_REVISION"])'
+          mkdir assets
+          gh release download "${tag}" --repo darron/go-opentunnel --dir assets
+          python3 homebrew-tap/.github/scripts/release_artifacts.py verify --output assets --tag "${tag}" --revision "${revision}"
+          printf 'tag=%s\nrevision=%s\n' "${tag}" "${revision}" >> "${GITHUB_OUTPUT}"
+      - name: Generate and check the binary formula
         id: formula
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_REVISION: ${{ steps.release.outputs.revision }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s homebrew-tap/.github/scripts -p 'test_update_homebrew.py'
-          python3 - <<'PY'
-          import os, sys
-          sys.path.insert(0, "homebrew-tap/.github/scripts")
-          from update_homebrew import update
-          changed = update("homebrew-tap", os.environ["RELEASE_TAG"], os.environ["SOURCE_SHA256"], os.environ["SOURCE_REVISION"])
-          validate = changed or os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"changed={str(changed).lower()}\nvalidate={str(validate).lower()}\n")
-          print("Updated formula." if changed else "Formula is already current.")
-          PY
+          python3 homebrew-tap/.github/scripts/update_homebrew.py --tap-dir homebrew-tap \
+            --tag "${RELEASE_TAG}" --assets-dir assets --revision "${RELEASE_REVISION}"
           ruby -c homebrew-tap/Formula/otgo.rb
+          digest="$(shasum -a 256 homebrew-tap/Formula/otgo.rb | cut -d ' ' -f 1)"
+          printf 'sha256=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
       - name: Commit candidate locally for Homebrew validation
-        if: steps.formula.outputs.changed == 'true'
         working-directory: homebrew-tap
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- "${TAP_FORMULA_PATH}"; then
-            echo "Homebrew formula is already current."
-            exit 0
+          if ! git diff --quiet -- Formula/otgo.rb; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Formula/otgo.rb
+            git commit -m "Update otgo to ${RELEASE_TAG}"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${TAP_FORMULA_PATH}"
-          git commit -m "Update otgo to ${RELEASE_TAG}"
-      - name: Validate candidate before publishing the tap
-        if: steps.formula.outputs.validate == 'true'
+      - name: Install, test and compare the exact release executable
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
           brew tap --custom-remote darron/otgo-ci "${GITHUB_WORKSPACE}/homebrew-tap"
           brew trust --formula darron/otgo-ci/otgo
           brew style darron/otgo-ci/otgo
           brew audit --strict darron/otgo-ci/otgo
-          brew install --build-from-source darron/otgo-ci/otgo
+          brew info --json=v2 --variations darron/otgo-ci/otgo > formula.json
+          python3 - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, "homebrew-tap/.github/scripts")
+          from release_artifacts import TARGETS, archive_name
+          formula = json.load(open("formula.json", encoding="utf-8"))["formulae"][0]
+          assert not formula["build_dependencies"] and not formula["dependencies"]
+          assert formula["versions"]["head"] is None
+          specs = [formula["urls"]["stable"]]
+          specs += [v["urls"]["stable"] for v in formula["variations"].values() if "urls" in v]
+          observed = {spec["url"]: spec["checksum"] for spec in specs}
+          for os_name, arch in TARGETS:
+              filename = archive_name(os.environ["RELEASE_TAG"], os_name, arch)
+              url = f'https://github.com/darron/go-opentunnel/releases/download/{os.environ["RELEASE_TAG"]}/{filename}'
+              assert observed[url] == hashlib.sha256((Path("assets") / filename).read_bytes()).hexdigest()
+          PY
+          brew install darron/otgo-ci/otgo
           brew test darron/otgo-ci/otgo
-          "$(brew --prefix otgo)/bin/otgo" help
+          case "$(uname -m)" in
+            arm64) arch=arm64 ;;
+            x86_64) arch=amd64 ;;
+            *) exit 1 ;;
+          esac
+          mkdir expected
+          tar -xzf "assets/otgo_${RELEASE_TAG#v}_darwin_${arch}.tar.gz" -C expected
+          cmp expected/otgo "$(brew --prefix otgo)/bin/otgo"
   publish:
     needs: validate
-    if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     env:
       RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-      SOURCE_SHA256: ${{ needs.validate.outputs.sha256 }}
-      SOURCE_REVISION: ${{ needs.validate.outputs.revision }}
+      RELEASE_REVISION: ${{ needs.validate.outputs.revision }}
+      FORMULA_SHA256: ${{ needs.validate.outputs.formula_sha256 }}
     steps:
-      # A fresh checkout prevents the release binary tested in the other job
-      # from leaving hooks, credential helpers or executable files here.
+      # Fresh runner: no release executable runs with publication credentials.
       # actions/checkout v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Recreate only the validated formula change
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s .github/scripts -p 'test_update_homebrew.py'
-          python3 .github/scripts/update_homebrew.py --tap-dir . --tag "${RELEASE_TAG}" --sha256 "${SOURCE_SHA256}" --revision "${SOURCE_REVISION}"
+          test "$(gh api "repos/darron/go-opentunnel/commits/${RELEASE_TAG}" --jq .sha)" = "${RELEASE_REVISION}"
+          gh release view "${RELEASE_TAG}" --repo darron/go-opentunnel --json tagName,isDraft,isPrerelease > release.json
+          python3 - <<'PYTHON'
+          import json, os
+          release = json.load(open("release.json", encoding="utf-8"))
+          if release["tagName"] != os.environ["RELEASE_TAG"] or release["isDraft"] or release["isPrerelease"]:
+              raise SystemExit("release must still be published and stable")
+          PYTHON
+          mkdir assets
+          gh release download "${RELEASE_TAG}" --repo darron/go-opentunnel --dir assets
+          python3 .github/scripts/update_homebrew.py --tap-dir . --tag "${RELEASE_TAG}" \
+            --assets-dir assets --revision "${RELEASE_REVISION}"
+          test "$(sha256sum Formula/otgo.rb | cut -d ' ' -f 1)" = "${FORMULA_SHA256}"
           ruby -c Formula/otgo.rb
           git config core.hooksPath /dev/null
-          if git diff --quiet -- Formula/otgo.rb; then
-            echo "Formula is already current."
-          else
+          if ! git diff --quiet -- Formula/otgo.rb; then
             test "$(git diff --name-only)" = "Formula/otgo.rb"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
