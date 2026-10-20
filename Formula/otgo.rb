@@ -5,25 +5,25 @@ class Otgo < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.2/otgo_0.14.2_darwin_arm64.tar.gz"
-      sha256 "100c96d06306af0cc72e6bfb4c43f076fd21a1d73b39ed57ca2d15a7978e724b"
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.3/otgo_0.14.3_darwin_arm64.tar.gz"
+      sha256 "88631f2c34976433c9d561bd318e10b3978ccbc558a0afdf524d0c3897da05c7"
     end
 
     on_intel do
-      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.2/otgo_0.14.2_darwin_amd64.tar.gz"
-      sha256 "62a3a98d3be1d674a8324bdab2779da386bdc975cc765f64cae64784c44ca330"
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.3/otgo_0.14.3_darwin_amd64.tar.gz"
+      sha256 "ca304bf009d8a67333f62d3602116698d65dab834f155fd30ff62652b7465b60"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.2/otgo_0.14.2_linux_arm64.tar.gz"
-      sha256 "956f4e790eea7f0041001294039ba31982076fe97f73971c58dbc009da7e394c"
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.3/otgo_0.14.3_linux_arm64.tar.gz"
+      sha256 "dbd1e25023de6a498f2801c1b96c958188a430191bb3105f8ec359a4ae909fd4"
     end
 
     on_intel do
-      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.2/otgo_0.14.2_linux_amd64.tar.gz"
-      sha256 "a0b686250da71356e8fcc84424c0503abe7bb98ab5aad165a11a477578eb8498"
+      url "https://github.com/darron/go-opentunnel/releases/download/v0.14.3/otgo_0.14.3_linux_amd64.tar.gz"
+      sha256 "9ba7abd4bd602c48a9a253804fae442fd6a9123e129fc18e1c726e76f4743240"
     end
   end
 
@@ -36,7 +36,7 @@ class Otgo < Formula
 
   test do
     assert_match "Usage: otgo", shell_output("#{bin}/otgo help")
-    assert_equal "otgo #{version} sha=0de13c2231322629bc4abd93b73661a018fe208f clean\n", shell_output("#{bin}/otgo version")
+    assert_equal "otgo #{version} sha=ee32736f3c274e759ba09a7cc8713500aa1f96ba clean\n", shell_output("#{bin}/otgo version")
     output = shell_output("#{bin}/otgo get --data-dir #{testpath}/tunnels --json")
     assert_equal "null\n", output
     refute_path_exists testpath/"tunnels/default/private-key.pem"
