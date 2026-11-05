@@ -10,6 +10,7 @@ name: Update fbhook
 
   pull_request:
     paths:
+      - '.github/actionlint.yaml'
       - '.github/workflows/update-fbhook.yml'
       - '.github/scripts/update_fbhook.py'
       - '.github/scripts/test_update_fbhook.py'
