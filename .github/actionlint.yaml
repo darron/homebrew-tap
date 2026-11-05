@@ -1,6 +1,7 @@
 # Actionlint 1.7.12 does not yet recognize GitHub's concurrency queue setting.
 # Keep all other checks enabled; remove this exception when the parser supports it.
 paths:
-  .github/workflows/update-fbhook.yml:
+  # Homebrew invokes Actionlint from outside the tap, using a relative path.
+  '**/.github/workflows/update-fbhook.yml':
     ignore:
       - '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$'
