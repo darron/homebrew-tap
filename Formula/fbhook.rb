@@ -4,22 +4,22 @@ class Fbhook < Formula
   license "MIT"
   on_macos do
     on_arm do
-      url "https://github.com/darron/fbhook/releases/download/v0.1.0/fbhook_0.1.0_darwin_arm64.tar.gz"
-      sha256 "223cf43530e1d928ed7b6ec9bd00728761b3b4b3b158b32c098c7f8670b716b7"
+      url "https://github.com/darron/fbhook/releases/download/v0.2.0/fbhook_0.2.0_darwin_arm64.tar.gz"
+      sha256 "539f0879affb46b73fb82cdf25983ce55c347de5251b3de8f7e42bf2ab0af3a2"
     end
     on_intel do
-      url "https://github.com/darron/fbhook/releases/download/v0.1.0/fbhook_0.1.0_darwin_amd64.tar.gz"
-      sha256 "9cc2d9db6368b0987db4c0206b8da25c95c289312483fe0c1c4d79c4efb4ecb3"
+      url "https://github.com/darron/fbhook/releases/download/v0.2.0/fbhook_0.2.0_darwin_amd64.tar.gz"
+      sha256 "9c8bf2eec8464e303b6520613b2be8b163d03dd2f2851432c539eb8cff9e7ae6"
     end
   end
   on_linux do
     on_arm do
-      url "https://github.com/darron/fbhook/releases/download/v0.1.0/fbhook_0.1.0_linux_arm64.tar.gz"
-      sha256 "266bcea09fc289eaa747f1bfe9cf0f20b533944ab02da94432da0d0463fa25c1"
+      url "https://github.com/darron/fbhook/releases/download/v0.2.0/fbhook_0.2.0_linux_arm64.tar.gz"
+      sha256 "70793a57b33f6a8abae0fd04fb90ef18468a6a97ce60d5b047175aa45853e56b"
     end
     on_intel do
-      url "https://github.com/darron/fbhook/releases/download/v0.1.0/fbhook_0.1.0_linux_amd64.tar.gz"
-      sha256 "029608c657639950bb464a2508f97b9c219a6139296fcd09db1e0a145f42b102"
+      url "https://github.com/darron/fbhook/releases/download/v0.2.0/fbhook_0.2.0_linux_amd64.tar.gz"
+      sha256 "46994766d98c27b26ea64dfe956537e33d6612624b26e29f8ccb9bd471490e94"
     end
   end
 
@@ -31,7 +31,7 @@ class Fbhook < Formula
     prefix.install "THIRD_PARTY_NOTICES.txt"
   end
   test do
-    assert_equal "fbhook #{version} sha=0027985e0e9d791375e9b5458b48a215e6051274 clean\n", shell_output("#{bin}/fbhook version")
+    assert_equal "fbhook #{version} sha=8c8892a37f75d0d66311a855db719236c4047fc9 clean\n", shell_output("#{bin}/fbhook version")
     assert_match "shared feedback", shell_output("#{bin}/fbhook help")
     assert_path_exists prefix/"THIRD_PARTY_NOTICES.txt"
   end
