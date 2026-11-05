@@ -34,12 +34,29 @@ Manual retries are supported; there is no scheduled polling. The dispatch uses
 `HOMEBREW_TAP_TOKEN` with Actions write permission for this tap. Validation and
 formula publishing use the tap's own Actions token.
 
+## Install fbhook
+
+```sh
+brew install darron/tap/fbhook
+brew test darron/tap/fbhook
+```
+
+The formula installs the prebuilt macOS or Linux executable for Intel/AMD or ARM.
+`brew upgrade darron/tap/fbhook` installs future releases.
+
+After publishing stable binaries, fbhook dispatches
+[Update fbhook](.github/workflows/update-fbhook.yml). The workflow checks all four
+archives and their checksums, installs and tests the native macOS binary, and
+compares it byte for byte before publishing the formula. Manual retries are
+supported; validation also runs on changes to the workflow or its scripts.
+
 ## Brewfile
 
 ```ruby
 tap "darron/tap"
 brew "dbrain"
 brew "otgo"
+brew "fbhook"
 ```
 
 ## Documentation

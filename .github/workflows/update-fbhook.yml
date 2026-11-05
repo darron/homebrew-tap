@@ -1,0 +1,192 @@
+name: Update fbhook
+
+"on":
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable tag with binaries; leave empty for latest
+        required: false
+        type: string
+
+  pull_request:
+    paths:
+      - '.github/workflows/update-fbhook.yml'
+      - '.github/scripts/update_fbhook.py'
+      - '.github/scripts/test_update_fbhook.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fbhook-homebrew-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'publish' }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: macos-15
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      revision: ${{ steps.release.outputs.revision }}
+      formula_sha256: ${{ steps.formula.outputs.sha256 }}
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: homebrew-tap
+          persist-credentials: false
+      - name: Validate stable release and download its published binaries
+        id: release
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${REQUESTED_TAG}"
+          if [ -z "${tag}" ]; then
+            tag="$(gh release view --repo darron/fbhook --json tagName --jq .tagName)"
+          fi
+          export RELEASE_TAG="${tag}"
+          python3 -c 'import os,sys; sys.path.insert(0,"homebrew-tap/.github/scripts"); from update_fbhook import version; version(os.environ["RELEASE_TAG"])'
+          gh release view "${tag}" --repo darron/fbhook --json tagName,isDraft,isPrerelease > release.json
+          python3 - <<'PY'
+          import json, os
+          release = json.load(open("release.json", encoding="utf-8"))
+          if release["tagName"] != os.environ["RELEASE_TAG"] or release["isDraft"] or release["isPrerelease"]:
+              raise SystemExit("release must be published and stable")
+          PY
+          revision="$(gh api "repos/darron/fbhook/commits/${tag}" --jq .sha)"
+          export RELEASE_REVISION="${revision}"
+          python3 -c 'import os,sys; sys.path.insert(0,"homebrew-tap/.github/scripts"); from update_fbhook import validate_metadata; validate_metadata(os.environ["RELEASE_TAG"],os.environ["RELEASE_REVISION"])'
+          mkdir assets
+          gh release download "${tag}" --repo darron/fbhook --dir assets
+          python3 -c 'import sys; sys.path.insert(0,"homebrew-tap/.github/scripts"); from update_fbhook import verify_bundle; verify_bundle("assets",sys.argv[1])' "${tag}"
+          printf 'tag=%s\nrevision=%s\n' "${tag}" "${revision}" >> "${GITHUB_OUTPUT}"
+      - name: Generate and check the binary formula
+        id: formula
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_REVISION: ${{ steps.release.outputs.revision }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s homebrew-tap/.github/scripts -p 'test_*.py'
+          python3 homebrew-tap/.github/scripts/update_fbhook.py --tap-dir homebrew-tap \
+            --tag "${RELEASE_TAG}" --assets-dir assets --revision "${RELEASE_REVISION}"
+          ruby -c homebrew-tap/Formula/fbhook.rb
+          digest="$(shasum -a 256 homebrew-tap/Formula/fbhook.rb | cut -d ' ' -f 1)"
+          printf 'sha256=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
+      - name: Commit candidate locally for Homebrew validation
+        working-directory: homebrew-tap
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- Formula/fbhook.rb; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Formula/fbhook.rb
+            git commit -m "Update fbhook to ${RELEASE_TAG}"
+          fi
+      - name: Install, test and compare the exact release executable
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          brew tap --custom-remote darron/fbhook-ci "${GITHUB_WORKSPACE}/homebrew-tap"
+          brew trust --formula darron/fbhook-ci/fbhook
+          brew style darron/fbhook-ci/fbhook
+          brew audit --strict darron/fbhook-ci/fbhook
+          brew info --json=v2 --variations darron/fbhook-ci/fbhook > formula.json
+          python3 - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, "homebrew-tap/.github/scripts")
+          from update_fbhook import TARGETS, archive_name
+          formula = json.load(open("formula.json", encoding="utf-8"))["formulae"][0]
+          assert not formula["build_dependencies"] and not formula["dependencies"]
+          assert formula["versions"]["head"] is None
+          specs = [formula["urls"]["stable"]]
+          specs += [v["urls"]["stable"] for v in formula["variations"].values() if "urls" in v]
+          observed = {spec["url"]: spec["checksum"] for spec in specs}
+          for os_name, arch in TARGETS:
+              filename = archive_name(os.environ["RELEASE_TAG"], os_name, arch)
+              url = f'https://github.com/darron/fbhook/releases/download/{os.environ["RELEASE_TAG"]}/{filename}'
+              assert observed[url] == hashlib.sha256((Path("assets") / filename).read_bytes()).hexdigest()
+          PY
+          brew install darron/fbhook-ci/fbhook
+          brew test darron/fbhook-ci/fbhook
+          case "$(uname -m)" in
+            arm64) arch=arm64 ;;
+            x86_64) arch=amd64 ;;
+            *) exit 1 ;;
+          esac
+          mkdir expected
+          tar -xzf "assets/fbhook_${RELEASE_TAG#v}_darwin_${arch}.tar.gz" -C expected
+          cmp expected/fbhook "$(brew --prefix fbhook)/bin/fbhook"
+  publish:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      RELEASE_REVISION: ${{ needs.validate.outputs.revision }}
+      FORMULA_SHA256: ${{ needs.validate.outputs.formula_sha256 }}
+    steps:
+      # Fresh runner: no release executable runs with publication credentials.
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: automation
+          persist-credentials: false
+      # Queued releases may outlive the dispatch commit. Use current main as
+      # the target, but execute only the pinned, validated updater above.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          path: homebrew-tap
+          persist-credentials: false
+      - name: Recreate only the validated formula change
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/darron/fbhook/commits/${RELEASE_TAG}" --jq .sha)" = "${RELEASE_REVISION}"
+          gh release view "${RELEASE_TAG}" --repo darron/fbhook --json tagName,isDraft,isPrerelease > release.json
+          python3 - <<'PYTHON'
+          import json, os
+          release = json.load(open("release.json", encoding="utf-8"))
+          if release["tagName"] != os.environ["RELEASE_TAG"] or release["isDraft"] or release["isPrerelease"]:
+              raise SystemExit("release must still be published and stable")
+          PYTHON
+          mkdir assets
+          gh release download "${RELEASE_TAG}" --repo darron/fbhook --dir assets
+          python3 automation/.github/scripts/update_fbhook.py --tap-dir homebrew-tap --tag "${RELEASE_TAG}" \
+            --assets-dir assets --revision "${RELEASE_REVISION}"
+          test "$(sha256sum homebrew-tap/Formula/fbhook.rb | cut -d ' ' -f 1)" = "${FORMULA_SHA256}"
+          test "$(gh api "repos/darron/fbhook/commits/${RELEASE_TAG}" --jq .sha)" = "${RELEASE_REVISION}"
+          ruby -c homebrew-tap/Formula/fbhook.rb
+          cd homebrew-tap
+          git config core.hooksPath /dev/null
+          if ! git diff --quiet -- Formula/fbhook.rb; then
+            test "$(git diff --name-only)" = "Formula/fbhook.rb"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Formula/fbhook.rb
+            git commit -m "Update fbhook to ${RELEASE_TAG}"
+          fi
+      - name: Push validated tap update
+        working-directory: homebrew-tap
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git --hostname github.com
+          git -c core.hooksPath=/dev/null push origin HEAD:main
